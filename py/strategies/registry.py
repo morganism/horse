@@ -18,6 +18,10 @@ from .exotic import ExoticPermutation, ExoticParams
 from .bayesian_correlation import BayesianCorrelation, BayesianParams
 from .odds_movement import OddsMovement, OddsMovementParams
 from .pattern_recognition import PatternRecognition, PatternParams
+# Iteration-2 new classes
+from .favourite_cover import FavouriteCover, FavCoverParams
+from .handicap_exploit import HandicapExploit, HandicapParams
+from .trainer_going import TrainerGoing, TrainerGoingParams
 
 
 # ─── Parameter Grids ────────────────────────────────────────────────────────
@@ -204,9 +208,93 @@ def build_pattern_variants(max_total: int = 40) -> list[Strategy]:
     return strategies
 
 
+FAV_COVER_GRID = {
+    "bet_type":            ["win", "each_way", "dutch_top2"],
+    "max_sp":              [2.5, 3.0, 4.0],
+    "min_sp":              [1.4, 1.6, 2.0],
+    "min_course_wins":     [1, 2],
+    "min_field_size":      [6, 8],
+    "race_type_filter":    ["any", "flat", "nh"],
+    "stake_fraction":      [0.02, 0.03],
+    "require_course_win":  [True, False],
+}
+
+HANDICAP_GRID = {
+    "min_field_size":         [8, 10, 12],
+    "max_field_size":         [16, 20],
+    "weight_below_top":       [10, 15],
+    "weight_above_bottom":    [5, 10],
+    "min_sp":                 [2.0, 3.0],
+    "max_sp":                 [8.0, 12.0],
+    "min_official_rating":    [70, 80, 90],
+    "race_type_filter":       ["any", "flat", "nh"],
+    "stake_fraction":         [0.02, 0.03],
+    "bet_type":               ["win", "each_way"],
+}
+
+TRAINER_GOING_GRID = {
+    "min_evidence":                [3, 5, 10],
+    "trainer_going_threshold":     [0.35, 0.45, 0.55],
+    "trainer_jockey_threshold":    [0.0, 0.40, 0.50],
+    "require_both":                [True, False],
+    "min_sp":                      [2.0, 3.0],
+    "max_sp":                      [10.0, 20.0],
+    "stake_fraction":              [0.01, 0.02],
+    "race_type_filter":            ["any", "flat", "nh"],
+}
+
+
+def build_fav_cover_variants(max_total: int = 20) -> list[Strategy]:
+    strategies = []
+    seen_names = set()
+    for p in _grid_variants(FAV_COVER_GRID, max_total * 4):
+        if len(strategies) >= max_total:
+            break
+        if p["min_sp"] >= p["max_sp"]:
+            continue
+        params = FavCoverParams(**p)
+        s = FavouriteCover(params)
+        if s.name not in seen_names:
+            seen_names.add(s.name)
+            strategies.append(s)
+    return strategies
+
+
+def build_handicap_variants(max_total: int = 20) -> list[Strategy]:
+    strategies = []
+    seen_names = set()
+    for p in _grid_variants(HANDICAP_GRID, max_total * 4):
+        if len(strategies) >= max_total:
+            break
+        if p["min_sp"] >= p["max_sp"] or p["min_field_size"] >= p["max_field_size"]:
+            continue
+        params = HandicapParams(**p)
+        s = HandicapExploit(params)
+        if s.name not in seen_names:
+            seen_names.add(s.name)
+            strategies.append(s)
+    return strategies
+
+
+def build_trainer_going_variants(max_total: int = 20, db_path: str = "") -> list[Strategy]:
+    strategies = []
+    seen_names = set()
+    for p in _grid_variants(TRAINER_GOING_GRID, max_total * 4):
+        if len(strategies) >= max_total:
+            break
+        if p["min_sp"] >= p["max_sp"]:
+            continue
+        params = TrainerGoingParams(**p)
+        s = TrainerGoing(params, db_path=db_path)
+        if s.name not in seen_names:
+            seen_names.add(s.name)
+            strategies.append(s)
+    return strategies
+
+
 def build_registry(db_path: str = "") -> list[Strategy]:
     """
-    Build the full strategy registry (250 variants).
+    Build the full strategy registry (~275 variants across 8 classes).
     Returns a list of named Strategy instances.
     """
     all_strategies = []
@@ -215,6 +303,10 @@ def build_registry(db_path: str = "") -> list[Strategy]:
     all_strategies.extend(build_bayesian_variants(50, db_path=db_path))
     all_strategies.extend(build_odds_movement_variants(40))
     all_strategies.extend(build_pattern_variants(40))
+    # Iteration-2 new classes
+    all_strategies.extend(build_fav_cover_variants(20))
+    all_strategies.extend(build_handicap_variants(20))
+    all_strategies.extend(build_trainer_going_variants(20, db_path=db_path))
     return all_strategies
 
 

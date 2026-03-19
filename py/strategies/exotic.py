@@ -30,6 +30,7 @@ class ExoticParams(StrategyParams):
     max_odds_include: float     # only include runners with odds <= this
     stake_per_combo: float      # fixed stake per combination (fraction of bankroll)
     class_max: int              # only enter races of this class or lower (higher = lower quality)
+    market_efficiency: float = 0.70  # bookmaker payout as fraction of theoretical — fixes #12
 
 
 class ExoticPermutation(Strategy):
@@ -105,7 +106,7 @@ class ExoticPermutation(Strategy):
                         bet_type="exacta",
                         runner_cloth_numbers=[r1["cloth_number"], r2["cloth_number"]],
                         stake_fraction=self.p.stake_per_combo,
-                        odds_estimate=odds,
+                        odds_estimate=odds * self.p.market_efficiency,
                         rationale=rationale,
                     ))
 
@@ -125,7 +126,7 @@ class ExoticPermutation(Strategy):
                             r1["cloth_number"], r2["cloth_number"], r3["cloth_number"]
                         ],
                         stake_fraction=self.p.stake_per_combo,
-                        odds_estimate=odds,
+                        odds_estimate=odds * self.p.market_efficiency,
                         rationale=rationale,
                     ))
 

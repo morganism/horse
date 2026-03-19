@@ -74,9 +74,20 @@ class DutchingEnvelope(Strategy):
             if total_inv >= threshold * 1.05:
                 return []
 
-        # Calculate a unit budget (stake_fraction * bankroll applied by runner)
-        # Return stake fractions; actual £ calculated by simulation runner
-        budget_fraction = 0.03  # 3% of strategy bankroll per Dutch bet
+        # Calculate stake budget based on stake_model param — fixes #11
+        if self.p.stake_model == "proportional":
+            # Scale budget with how far below threshold we are (more headroom = bigger bet)
+            headroom = max(0.0, threshold - total_inv)
+            budget_fraction = min(0.05, 0.01 + headroom * 0.3)
+        elif self.p.stake_model == "kelly":
+            # Kelly: edge = (1/total_inv - 1), fraction = edge / avg_odds
+            edge = (1.0 / total_inv) - 1.0
+            avg_odds = sum(odds_list) / len(odds_list)
+            kelly_f = max(0.0, edge / (avg_odds - 1.0)) * 0.25  # quarter-Kelly
+            budget_fraction = min(0.05, kelly_f)
+        else:  # "level" — fixed fraction
+            budget_fraction = 0.03
+
         stakes = dutch_stakes(odds_list, budget_fraction)
         expected_return = dutch_return(odds_list, budget_fraction)
         combined_expected_odds = expected_return / budget_fraction
