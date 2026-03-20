@@ -190,12 +190,16 @@ end
 
 get '/calendar' do
   require_login!
-  today      = Date.today
-  @year      = (params[:year]  || today.year).to_i
-  @month     = (params[:month] || today.month).to_i
-  @year, @month = today.year, today.month unless (1..12).include?(@month)
+  # Default to the month containing the most recent sim race, not wall-clock today.
+  @db_latest = Date.parse(db.latest_race_date)
+  if params[:year] || params[:month]
+    @year  = params[:year].to_i.nonzero?  || @db_latest.year
+    @month = params[:month].to_i.nonzero? || @db_latest.month
+  else
+    @year, @month = @db_latest.year, @db_latest.month
+  end
+  @year, @month = @db_latest.year, @db_latest.month unless (1..12).include?(@month)
   @race_days = db.calendar_month(year: @year, month: @month)
-  @today     = today.iso8601
   erb :calendar
 end
 
@@ -206,27 +210,25 @@ get '/calendar/:date' do
   rescue ArgumentError
     halt 400, 'Invalid date'
   end
-  @races    = db.races_on_date(@date.iso8601)
-  @today    = Date.today.iso8601
-  @is_today = @date.iso8601 == @today
+  @races     = db.races_on_date(@date.iso8601)
+  @db_latest = Date.parse(db.latest_race_date)
+  @is_latest = @date == @db_latest   # "today" in sim terms — latest data day
 
-  # For each past race, load strategy P&L ranking
-  unless @date > Date.today
-    @race_strategies = {}
-    @races.each do |race|
-      @race_strategies[race[:id]] = db.race_strategy_performance(race[:id])
-    end
+  # Load strategy P&L for all dates that have data
+  @race_strategies = {}
+  @races.each do |race|
+    @race_strategies[race[:id]] = db.race_strategy_performance(race[:id])
   end
 
-  # For today, run strategy matcher on each race
-  if @is_today
+  # On the latest sim day, also run strategy matcher
+  if @is_latest
     hypos = db.hypothesis(min_evidence: 3, limit: 300)
     @match_results = {}
     @races.each do |race|
       runners = db.race_runners(race[:id])
       @match_results[race[:id]] = StrategyMatcher.new(runners, hypos).suggestions
     end
-    @predictions = db.real_race_predictions(date: @today)
+    @predictions = db.real_race_predictions(date: @date.iso8601)
   end
 
   erb :calendar_day

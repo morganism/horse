@@ -4,8 +4,8 @@
   <h2 class="fw-bold mb-0">
     <i class="bi bi-calendar-day text-warning me-2"></i>
     <%= @date.strftime('%A, %d %B %Y') %>
-    <% if @is_today %>
-      <span class="badge bg-warning text-dark ms-2">TODAY</span>
+    <% if @is_latest %>
+      <span class="badge bg-warning text-dark ms-2">LATEST</span>
     <% end %>
   </h2>
   <a href="/calendar?year=<%= @date.year %>&month=<%= @date.month %>"
@@ -18,7 +18,7 @@
   <div class="alert alert-secondary">No races found for this date.</div>
 <% else %>
 
-  <% if @is_today && @match_results %>
+  <% if @is_latest && @match_results %>
     <!-- ── Today: strategy matcher suggestions ─────────────────────────── -->
     <div class="mb-4">
       <h5 class="text-warning"><i class="bi bi-lightning-charge me-1"></i>Strategy Matcher — Suggested Bets</h5>
@@ -123,14 +123,14 @@
   <% end %>
 
   <!-- ── Race card ──────────────────────────────────────────────────────── -->
-  <h5 class="<%= @is_today ? 'text-info' : 'text-warning' %> mb-3">
+  <h5 class="<%= @is_latest ? 'text-info' : 'text-warning' %> mb-3">
     <i class="bi bi-flag me-1"></i>
     Race Card (<%= @races.size %> race<%= @races.size == 1 ? '' : 's' %>)
   </h5>
 
   <% @races.each do |race| %>
     <%
-      is_future = @date > Date.today
+      is_future = @date > @db_latest   # beyond the sim data range
       strats    = @race_strategies&.dig(race[:id])
     %>
     <div class="card bg-dark border-secondary mb-3">

@@ -309,6 +309,12 @@ class DBReader
 
   # ── Calendar ───────────────────────────────────────────────────────────────
 
+  # Latest race_date present in the DB (used to anchor the calendar default).
+  def latest_race_date
+    row = query_one('SELECT MAX(race_date) AS d FROM races')
+    row && row[:d] ? row[:d] : Date.today.iso8601
+  end
+
   # Returns one row per distinct race_date in the month, with race_count.
   def calendar_month(year:, month:)
     prefix = format('%04d-%02d', year, month)
