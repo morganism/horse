@@ -1,0 +1,105 @@
+<% @title = 'Strategies' %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="fw-bold mb-0"><i class="bi bi-bar-chart-line text-warning me-2"></i>Strategies</h2>
+</div>
+
+<!-- Filter/Sort -->
+<form method="GET" action="/strategies" class="row g-2 mb-4">
+  <div class="col-auto">
+    <select name="strategy_class" class="form-select form-select-sm bg-dark text-white border-secondary">
+      <option value="">All classes</option>
+      <% @strategy_classes.each do |sc| %>
+        <option value="<%= sc[:strategy_class] %>" <%= 'selected' if params[:strategy_class] == sc[:strategy_class] %>>
+          <%= sc[:strategy_class] %> (<%= sc[:n] %>)
+        </option>
+      <% end %>
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="sort" class="form-select form-select-sm bg-dark text-white border-secondary">
+      <% %w[roi profit_loss total_bets wins strike_rate sharpe max_drawdown].each do |s| %>
+        <option value="<%= s %>" <%= 'selected' if (params[:sort] || 'roi') == s %>><%= s.tr('_',' ').capitalize %></option>
+      <% end %>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-warning" type="submit">Sort / Filter</button>
+    <a href="/strategies" class="btn btn-sm btn-outline-secondary">Reset</a>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-dark table-hover table-sm">
+    <thead>
+      <tr>
+        <th>Class</th><th>Variant</th>
+        <%
+          _ep = { strategy_class: params[:strategy_class], page: @page }
+          _u  = '/strategies'
+          _sc = @sort_col
+          _sd = @sort_dir
+        %>
+        <%= sort_th('ROI%',   'roi',          sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('P&L',    'profit_loss',  sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('Bets',   'total_bets',   sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('Wins',   'wins',         sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('SR%',    'strike_rate',  sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('Sharpe', 'sharpe',       sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <%= sort_th('DD%',    'max_drawdown', sort_col: _sc, sort_dir: _sd, base_url: _u, extra_params: _ep, css: 'text-end') %>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @strategies.each do |s| %>
+        <tr>
+          <td><span class="badge bg-secondary small"><%= s[:strategy_class] %></span></td>
+          <td class="small"><%= s[:variant_name] %></td>
+          <td class="text-end fw-bold <%= s[:roi].to_f >= 0 ? 'text-success' : 'text-danger' %>">
+            <%= "%.1f" % s[:roi].to_f %>
+          </td>
+          <td class="text-end small <%= s[:profit_loss].to_f >= 0 ? 'text-success' : 'text-danger' %>">
+            £<%= "%.2f" % s[:profit_loss].to_f %>
+          </td>
+          <td class="text-end small"><%= s[:total_bets] %></td>
+          <td class="text-end small"><%= s[:wins] %></td>
+          <td class="text-end small">
+            <% sr = s[:total_bets].to_f > 0 ? (s[:wins].to_f / s[:total_bets].to_f * 100) : 0 %>
+            <%= "%.1f" % sr %>
+          </td>
+          <td class="text-end small <%= s[:sharpe].to_f >= 1 ? 'text-success' : s[:sharpe].to_f >= 0 ? '' : 'text-danger' %>">
+            <%= s[:sharpe] ? "%.2f" % s[:sharpe].to_f : '—' %>
+          </td>
+          <td class="text-end small text-warning">
+            <%= s[:max_drawdown] ? "%.1f" % s[:max_drawdown].to_f : '—' %>
+          </td>
+          <td><a href="/strategies/<%= s[:strategy_id] %>" class="btn btn-sm btn-outline-secondary py-0">View</a></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<nav>
+  <ul class="pagination pagination-sm justify-content-center">
+    <% if @page > 1 %>
+      <li class="page-item">
+        <a class="page-link bg-dark border-secondary"
+           href="/strategies?page=<%= @page-1 %>&sort=<%= params[:sort] %>&strategy_class=<%= params[:strategy_class] %>">
+          &laquo; Prev
+        </a>
+      </li>
+    <% end %>
+    <li class="page-item disabled">
+      <span class="page-link bg-dark border-secondary">Page <%= @page %></span>
+    </li>
+    <% if @strategies.length >= 50 %>
+      <li class="page-item">
+        <a class="page-link bg-dark border-secondary"
+           href="/strategies?page=<%= @page+1 %>&sort=<%= params[:sort] %>&strategy_class=<%= params[:strategy_class] %>">
+          Next &raquo;
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</nav>

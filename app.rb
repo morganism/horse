@@ -19,9 +19,11 @@ require 'json'
 require 'redcarpet'
 
 $LOAD_PATH.unshift(File.join(__dir__, 'lib'))
+require 'cgi'
 require 'db_reader'
 require 'python_runner'
 require 'auth'
+require 'sortable_table'
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ configure :development do
 end
 
 helpers AuthHelpers
+helpers SortableTable
 
 helpers do
   def db
@@ -140,7 +143,10 @@ end
 get '/strategies' do
   require_login!
   @page             = [params[:page].to_i, 1].max
-  @strategies       = db.strategies(sort:           params[:sort] || 'roi',
+  @sort_col         = params[:sort] || 'roi'
+  @sort_dir         = params[:dir]  || 'desc'
+  @strategies       = db.strategies(sort:           @sort_col,
+                                     dir:            @sort_dir,
                                      page:           @page,
                                      per_page:       50,
                                      strategy_class: params[:strategy_class].presence)

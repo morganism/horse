@@ -1,0 +1,74 @@
+<% @title = 'Races' %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="fw-bold mb-0"><i class="bi bi-flag text-warning me-2"></i>Races</h2>
+  <span class="text-muted"><%= @total %> total</span>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="/races" class="row g-2 mb-4">
+  <div class="col-auto">
+    <select name="race_type" class="form-select form-select-sm bg-dark text-white border-secondary">
+      <option value="">All types</option>
+      <option value="flat"   <%= 'selected' if params[:race_type] == 'flat' %>>Flat</option>
+      <option value="nh"     <%= 'selected' if params[:race_type] == 'nh' %>>NH</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <input type="number" name="sim_day" class="form-control form-control-sm bg-dark text-white border-secondary"
+           placeholder="Day" value="<%= params[:sim_day] %>" min="1" style="width:80px">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-warning" type="submit">Filter</button>
+    <a href="/races" class="btn btn-sm btn-outline-secondary">Clear</a>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-dark table-hover table-sm sortable-table">
+    <thead class="table-dark">
+      <tr>
+        <th data-col="0">Day</th><th data-col="1">Date</th><th data-col="2">Time</th><th data-col="3">Venue</th>
+        <th data-col="4">Type</th><th data-col="5">Going</th><th data-col="6">Dist (f)</th><th data-col="7">Runners</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @races.each do |r| %>
+        <tr>
+          <td><span class="badge bg-secondary"><%= r[:sim_day] %></span></td>
+          <td><%= r[:race_date] %></td>
+          <td><%= r[:race_time] %></td>
+          <td><%= r[:venue_name] %> <small class="text-muted">(<%= r[:country] %>)</small></td>
+          <td><span class="badge <%= r[:race_type] == 'flat' ? 'bg-info' : 'bg-warning text-dark' %>"><%= r[:race_type] %></span></td>
+          <td><%= r[:going] %></td>
+          <td><%= r[:distance_furlongs] %></td>
+          <td><%= r[:runner_count] %></td>
+          <td><a href="/races/<%= r[:id] %>" class="btn btn-xs btn-outline-secondary btn-sm py-0">View</a></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<nav>
+  <ul class="pagination pagination-sm justify-content-center">
+    <% if @page > 1 %>
+      <li class="page-item">
+        <a class="page-link bg-dark border-secondary" href="/races?page=<%= @page - 1 %>&race_type=<%= params[:race_type] %>&sim_day=<%= params[:sim_day] %>">
+          &laquo; Prev
+        </a>
+      </li>
+    <% end %>
+    <li class="page-item disabled">
+      <span class="page-link bg-dark border-secondary">Page <%= @page %></span>
+    </li>
+    <% if @races.length >= 30 %>
+      <li class="page-item">
+        <a class="page-link bg-dark border-secondary" href="/races?page=<%= @page + 1 %>&race_type=<%= params[:race_type] %>&sim_day=<%= params[:sim_day] %>">
+          Next &raquo;
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</nav>
