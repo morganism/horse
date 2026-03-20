@@ -19,9 +19,11 @@ require 'json'
 require 'redcarpet'
 
 $LOAD_PATH.unshift(File.join(__dir__, 'lib'))
+require 'cgi'
 require 'db_reader'
 require 'python_runner'
 require 'auth'
+require 'sortable_table'
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ configure :development do
 end
 
 helpers AuthHelpers
+helpers SortableTable
 
 helpers do
   def db
@@ -140,7 +143,10 @@ end
 get '/strategies' do
   require_login!
   @page             = [params[:page].to_i, 1].max
-  @strategies       = db.strategies(sort:           params[:sort] || 'roi',
+  @sort_col         = params[:sort] || 'roi'
+  @sort_dir         = params[:dir]  || 'desc'
+  @strategies       = db.strategies(sort:           @sort_col,
+                                     dir:            @sort_dir,
                                      page:           @page,
                                      per_page:       50,
                                      strategy_class: params[:strategy_class].presence)
@@ -206,6 +212,66 @@ post '/api/reset' do
   require_login!
   result = runner.reset!
   json success: result[:success], error: result[:error]
+end
+
+# ── Strategy class descriptions ───────────────────────────────────────────────
+STRATEGY_CLASS_INFO = {
+  'DutchingEnvelope' => {
+    colour: '#0d6efd',
+    tagline: 'Cover multiple runners at a guaranteed return',
+    description: 'Places proportional stakes across a selection of runners so that any winner returns the same profit. Uses level, proportional, or Kelly stake models. Profitable when the sum of implied probabilities (1/odds) across the covered field is below 1.0. Best suited to races where 2–4 runners dominate the market.',
+    params: 'min_runners, max_runners, budget_pct, stake_model, min_field_prob'
+  },
+  'ExoticPermutation' => {
+    colour: '#6f42c1',
+    tagline: 'Exacta & trifecta permutation bets',
+    description: 'Generates exacta (1st + 2nd) and trifecta (1st + 2nd + 3rd) combination bets using probability-ranked selections. Applies a market-efficiency factor (~0.70) to correct theoretical exotic payouts toward realistic bookmaker returns. High variance, high ceiling.',
+    params: 'bet_type, top_n, market_efficiency, min_prob_edge'
+  },
+  'BayesianCorrelation' => {
+    colour: '#20c997',
+    tagline: 'Bayesian win-probability signals from priors',
+    description: 'Maintains Beta-distribution priors (α, β) per trainer, jockey, going, and course combination. Updates after each race: α += 1 on win, β += 1 on loss. Bets when the posterior mean exceeds a configurable confidence threshold. Requires sufficient prior data (90+ days recommended).',
+    params: 'confidence_threshold, min_evidence, hypothesis_type'
+  },
+  'OddsMovement' => {
+    colour: '#fd7e14',
+    tagline: 'Trade on significant pre-race odds drift',
+    description: 'Monitors the odds_history table for runners whose price has shortened or drifted significantly in the hours before race-off. A shortening price (steam) suggests informed money; a drifting price suggests market weakness. Bets in the direction of the movement when the change exceeds a minimum threshold.',
+    params: 'movement_threshold, hours_window, direction, min_sp'
+  },
+  'PatternRecognition' => {
+    colour: '#ffc107',
+    tagline: 'Form-cycle and rest-period pattern matching',
+    description: 'Identifies horses whose recent form sequence and days-since-last-run match historically profitable patterns. Looks for improving sequences (e.g. 3rd → 2nd → win) and optimal freshness windows. Combines multiple pattern signals into a composite score.',
+    params: 'pattern_type, days_since_run_min, days_since_run_max, min_form_score'
+  },
+  'FavouriteCover' => {
+    colour: '#dc3545',
+    tagline: 'Target short-priced course specialists',
+    description: 'Focuses on runners priced at or below a maximum SP threshold (typically ≤ 3.0) who have demonstrated course-winning form. Offers win, each-way, or dutched top-2 bet types. Highest average simulated ROI (+78%) of all strategy classes — best used in fields of 8 or fewer.',
+    params: 'max_sp, min_sp, bet_type, require_course_win'
+  },
+  'HandicapExploit' => {
+    colour: '#6c757d',
+    tagline: 'Weight sweet-spot in handicap races',
+    description: 'Targets handicap runners carrying between 5 and 15 lbs below the top weight — a range empirically associated with favourable mark relative to ability. Filters by minimum official rating and race class. Currently under recalibration (ROI –49% in sim; issue #19).',
+    params: 'weight_below_top_min, weight_below_top_max, min_rating, max_class'
+  },
+  'TrainerGoing' => {
+    colour: '#17a2b8',
+    tagline: 'Dual Bayesian signal: trainer × going × jockey',
+    description: 'Combines two Bayesian hypotheses: (1) trainer win-rate on a specific going type, and (2) trainer–jockey partnership win-rate. The require_both flag controls whether both signals must fire (AND) or either is sufficient (OR). Needs 90+ days of data to build reliable posteriors.',
+    params: 'min_confidence, require_both, min_evidence'
+  }
+}.freeze
+
+# JSON endpoint — strategy class info for modal display
+get '/api/strategy_class/:name' do
+  require_login!
+  info = STRATEGY_CLASS_INFO[params[:name]]
+  halt 404, json(error: 'Unknown class') unless info
+  json({ name: params[:name] }.merge(info))
 end
 
 # ── Health / API ──────────────────────────────────────────────────────────────
