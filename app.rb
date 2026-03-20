@@ -174,7 +174,9 @@ end
 get '/rota' do
   require_login!
   rota_path  = File.join(__dir__, 'ROTA.md')
+
   rota_text  = File.exist?(rota_path) ? File.read(rota_path, encoding: 'UTF-8') : '# ROTA.md not found'
+
   @rota_html = markdown(rota_text)
   erb :rota
 end
