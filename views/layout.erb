@@ -41,6 +41,11 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <%= 'active' if request.path_info.start_with?('/calendar') %>" href="/calendar">
+            <i class="bi bi-calendar3 me-1"></i>Calendar
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <%= 'active' if request.path_info == '/correlations' %>" href="/correlations">
             <i class="bi bi-diagram-3 me-1"></i>Correlations
           </a>

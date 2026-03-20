@@ -24,6 +24,7 @@ require 'db_reader'
 require 'python_runner'
 require 'auth'
 require 'sortable_table'
+require 'strategy_matcher'
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -183,6 +184,88 @@ get '/rota' do
   rota_text  = File.exist?(rota_path) ? File.read(rota_path, encoding: 'UTF-8') : '# ROTA.md not found'
   @rota_html = markdown(rota_text)
   erb :rota
+end
+
+# ── Calendar ─────────────────────────────────────────────────────────────────
+
+get '/calendar' do
+  require_login!
+  today      = Date.today
+  @year      = (params[:year]  || today.year).to_i
+  @month     = (params[:month] || today.month).to_i
+  @year, @month = today.year, today.month unless (1..12).include?(@month)
+  @race_days = db.calendar_month(year: @year, month: @month)
+  @today     = today.iso8601
+  erb :calendar
+end
+
+get '/calendar/:date' do
+  require_login!
+  begin
+    @date = Date.parse(params[:date])
+  rescue ArgumentError
+    halt 400, 'Invalid date'
+  end
+  @races    = db.races_on_date(@date.iso8601)
+  @today    = Date.today.iso8601
+  @is_today = @date.iso8601 == @today
+
+  # For each past race, load strategy P&L ranking
+  unless @date > Date.today
+    @race_strategies = {}
+    @races.each do |race|
+      @race_strategies[race[:id]] = db.race_strategy_performance(race[:id])
+    end
+  end
+
+  # For today, run strategy matcher on each race
+  if @is_today
+    hypos = db.hypothesis(min_evidence: 3, limit: 300)
+    @match_results = {}
+    @races.each do |race|
+      runners = db.race_runners(race[:id])
+      @match_results[race[:id]] = StrategyMatcher.new(runners, hypos).suggestions
+    end
+    @predictions = db.real_race_predictions(date: @today)
+  end
+
+  erb :calendar_day
+end
+
+# ── Predictions API ──────────────────────────────────────────────────────────
+
+post '/api/predictions' do
+  require_login!
+  body  = JSON.parse(request.body.read) rescue {}
+  required = %w[race_date venue race_time horse_name strategy_class bet_type stake_pct]
+  missing  = required.reject { |k| body[k].to_s.strip.length > 0 }
+  halt 422, json(error: "Missing fields: #{missing.join(', ')}") if missing.any?
+
+  id = db.save_prediction(
+    race_date:          body['race_date'],
+    venue:              body['venue'],
+    race_time:          body['race_time'],
+    horse_name:         body['horse_name'],
+    strategy_class:     body['strategy_class'],
+    bet_type:           body['bet_type'],
+    stake_pct:          body['stake_pct'].to_f,
+    predicted_position: body['predicted_position']&.to_i,
+    confidence:         body['confidence']&.to_f,
+    sp_at_tip:          body['sp_at_tip']&.to_f
+  )
+  json id: id, status: 'saved'
+end
+
+post '/api/settle_prediction/:id' do
+  require_login!
+  body = JSON.parse(request.body.read) rescue {}
+  halt 422, json(error: 'actual_position required') unless body['actual_position']
+  db.settle_prediction(
+    id:               params[:id].to_i,
+    actual_position:  body['actual_position'].to_i,
+    profit_loss:      body['profit_loss'].to_f
+  )
+  json status: 'settled'
 end
 
 # ── Simulation ────────────────────────────────────────────────────────────────

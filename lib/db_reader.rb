@@ -307,6 +307,81 @@ class DBReader
     query('SELECT * FROM bankroll_snapshots WHERE strategy_id = ? ORDER BY sim_day', strategy_id)
   end
 
+  # ── Calendar ───────────────────────────────────────────────────────────────
+
+  # Returns one row per distinct race_date in the month, with race_count.
+  def calendar_month(year:, month:)
+    prefix = format('%04d-%02d', year, month)
+    query(<<~SQL, "#{prefix}-%")
+      SELECT r.race_date,
+             COUNT(DISTINCT r.id) AS race_count,
+             GROUP_CONCAT(DISTINCT v.name ORDER BY v.name) AS venues
+      FROM races r JOIN venues v ON r.venue_id = v.id
+      WHERE r.race_date LIKE ?
+      GROUP BY r.race_date
+      ORDER BY r.race_date
+    SQL
+  end
+
+  # All races on a specific date (YYYY-MM-DD), with strategy P&L per unit.
+  def races_on_date(date)
+    query(<<~SQL, date)
+      SELECT r.*, v.name AS venue_name, v.country
+      FROM races r JOIN venues v ON r.venue_id = v.id
+      WHERE r.race_date = ?
+      ORDER BY r.race_time ASC
+    SQL
+  end
+
+  # Strategies that placed bets on a specific race, ranked by P&L per unit staked.
+  def race_strategy_performance(race_id)
+    query(<<~SQL, race_id)
+      SELECT s.id AS strategy_id, s.strategy_class, s.variant_name,
+             COUNT(b.id) AS bets,
+             SUM(b.stake) AS staked,
+             SUM(COALESCE(b.payout, 0)) - SUM(b.stake) AS pl,
+             ROUND((SUM(COALESCE(b.payout, 0)) - SUM(b.stake)) / NULLIF(SUM(b.stake), 0), 4) AS pl_per_unit
+      FROM bets b
+      JOIN strategies s ON b.strategy_id = s.id
+      WHERE b.race_id = ? AND b.status != 'pending'
+      GROUP BY s.id
+      ORDER BY pl_per_unit DESC NULLS LAST
+    SQL
+  end
+
+  # ── Real-race predictions ──────────────────────────────────────────────────
+
+  def real_race_predictions(date: nil)
+    if date
+      query('SELECT * FROM real_race_predictions WHERE race_date = ? ORDER BY race_time, id', date)
+    else
+      query('SELECT * FROM real_race_predictions ORDER BY race_date DESC, race_time, id')
+    end
+  rescue SQLite3::Exception
+    []  # table may not exist yet on older DBs
+  end
+
+  def save_prediction(race_date:, venue:, race_time:, horse_name:,
+                      strategy_class:, bet_type:, stake_pct:,
+                      predicted_position: nil, confidence: nil, sp_at_tip: nil)
+    db.execute(<<~SQL, race_date, venue, race_time, horse_name,
+      INSERT INTO real_race_predictions
+        (race_date, venue, race_time, horse_name, strategy_class, bet_type,
+         stake_pct, predicted_position, confidence, sp_at_tip)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    SQL
+      strategy_class, bet_type, stake_pct, predicted_position, confidence, sp_at_tip)
+    db.last_insert_row_id
+  end
+
+  def settle_prediction(id:, actual_position:, profit_loss:)
+    db.execute(<<~SQL, actual_position, profit_loss, Time.now.iso8601, id)
+      UPDATE real_race_predictions
+      SET actual_position = ?, profit_loss = ?, settled = 1, settled_at = ?
+      WHERE id = ?
+    SQL
+  end
+
   private
 
   def db

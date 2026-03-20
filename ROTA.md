@@ -1,7 +1,7 @@
 # Horse Racing Strategy — Task Rota
 
-**Current Iteration**: 2
-**Last Updated**: 2026-03-19
+**Current Iteration**: 3
+**Last Updated**: 2026-03-20
 **Assigned Agent**: Claude Code (Sonnet 4.6)
 **Rule**: Each iteration must add ≥3 new tasks. Completed one-off tasks are closed; recurring tasks stay in RECURRING.
 
@@ -20,6 +20,13 @@
 | 2 | Score and rank all 215 strategies | #15 | Composite formula applied |
 | 2 | Create 3 new strategy classes | #16 | FavouriteCover, HandicapExploit, TrainerGoing |
 | 2 | Post iteration-2 status report | #17 | 275 strategies, 87.5% race coverage |
+| 2 | Build Sinatra frontend | #24–#33 | Full app: auth, dashboard, races, strategies, correlations |
+| 2 | Fix NilClass#presence routing errors | #23 ✅ PR #24 | All routes live |
+| 2 | Fix simulation --db arg | #27 ✅ PR #29 | PythonRunner fixed |
+| 2 | Fix ROTA encoding error | #28 ✅ PR #30 | UTF-8 read |
+| 2 | Sortable table columns | #25 ✅ PR #33 | SVG sort indicators |
+| 2 | Strategy class modal | #26 ✅ PR #33 | Bootstrap modal, 8 classes described |
+| 2 | Fix dashboard top-strategy link | #35 ✅ PR #36 | 404 resolved |
 
 ---
 
@@ -29,7 +36,7 @@
 |-------|------|---------|
 | #15 | Score and rank all strategy variants (composite leaderboard) | Iter 2 ✓ |
 | #16 | Analyse missed opportunities → create ≥3 new variants | Iter 2 ✓ |
-| #17 | Update ROTA.md + post status report + assign ≥3 new tasks | Iter 2 ✓ |
+| #17 | Update ROTA.md + post status report + assign ≥3 new tasks | Iter 3 ✓ |
 
 ---
 
@@ -37,8 +44,12 @@
 
 | Priority | Issue | Task | Type |
 |----------|-------|------|------|
-| HIGH | #22 | Implement each-way settling in settler.py | Bug fix |
-| HIGH | #20 | Extend simulation to 90 days (Bayesian maturity) | Analysis |
+| HIGH | #37 | **Race Calendar** — past/today/future in monthly grid, strategy P&L per race | Feature |
+| HIGH | #38 | **Real-race prediction tracking** — `real_race_predictions` table, settle actuals | Feature |
+| HIGH | #39 | **Today's races strategy matcher** — apply registry to live card, suggest bets | Feature |
+| MED | #40 | Iter-3 strategy tasks: retire OddsMovement tail, recalibrate HandicapExploit, expand PatternRecognition | Optimisation |
+| MED | #22 | Implement each-way settling in settler.py | Bug fix |
+| MED | #20 | Extend simulation to 90 days (Bayesian maturity) | Analysis |
 | MED | #18 | Retire bottom 24 OddsMovement variants, tune survivors | Optimisation |
 | MED | #19 | Recalibrate HandicapExploit weight scoring | Bug fix |
 | MED | #21 | Expand PatternRecognition to 40 variants | Feature |
@@ -63,6 +74,31 @@
 | 8 | TrainerGoing *(new)* | 20 | n/a | n/a | n/a | 🆕 OBSERVE |
 
 †Corrected with market_efficiency=0.70 (#12 fixed)
+
+---
+
+## 🗓️ ITERATION 3 — NEW TASKS
+
+### Task #37: Race Calendar
+Monthly calendar view at `/calendar`. Each day cell:
+- **Past days with races**: badge showing race count; click → day detail with races + strategies ranked by P&L/unit
+- **Today**: highlighted in gold; shows race card + strategy matcher with suggested bets
+- **Future days**: greyed; click → placeholder (date/time only)
+
+### Task #38: Real-race prediction tracking
+New table `real_race_predictions`. When strategy matcher fires on today's races:
+- Record: date, venue, time, horse, strategy, bet_type, stake_pct, predicted_position
+- After results known: settle with actual_position + profit_loss
+- Source flag `'real'` distinguishes from simulation bets
+- Accuracy metrics feed back to strategy scoring
+
+### Task #39: Today's races strategy matcher
+`lib/strategy_matcher.rb` — Ruby implementation of top-4 strategies applied to a live race card:
+- **FavouriteCover**: SP ≤ 3.0, check form figures
+- **DutchingEnvelope**: compute dutch sum, flag if < 1.0
+- **PatternRecognition**: parse form string for improving sequence
+- **BayesianCorrelation**: look up trainer×going priors in hypothesis table
+Returns ranked bet suggestions with stake % and confidence score.
 
 ---
 
@@ -105,7 +141,8 @@ Remaining 80 missed races breakdown:
 | Iter | Date | Strategies | Race Coverage | Key Change | Status |
 |------|------|-----------|---------------|------------|--------|
 | 1 | 2026-03-19 | 215 | 82.7% | Initial build | ✅ |
-| 2 | 2026-03-19 | 275 | 87.5% | 3 new classes, 2 bug fixes | ✅ |
+| 2 | 2026-03-19 | 275 | 87.5% | 3 new classes, 2 bug fixes, full Sinatra frontend | ✅ |
+| 3 | 2026-03-20 | 275 | 87.5% | Calendar, real-race predictions, strategy matcher | 🔄 |
 
 ---
 
