@@ -1,0 +1,112 @@
+<% @title = "Race ##{@race[:id]}" %>
+
+<div class="mb-3">
+  <a href="/races" class="btn btn-sm btn-outline-secondary">← Races</a>
+</div>
+
+<div class="row mb-3">
+  <div class="col">
+    <h3 class="fw-bold">
+      <%= @race[:venue_name] %> — <%= @race[:race_date] %> <%= @race[:race_time] %>
+    </h3>
+    <div class="d-flex gap-3 text-muted">
+      <span><span class="badge <%= @race[:race_type] == 'flat' ? 'bg-info' : 'bg-warning text-dark' %>"><%= @race[:race_type] %></span></span>
+      <span><i class="bi bi-cloud me-1"></i><%= @race[:going] %></span>
+      <span><i class="bi bi-arrows-expand-vertical me-1"></i><%= @race[:distance_furlongs] %> furlongs</span>
+      <span><i class="bi bi-people me-1"></i><%= @race[:runner_count] %> runners</span>
+      <span class="badge bg-secondary">Day <%= @race[:sim_day] %></span>
+    </div>
+  </div>
+</div>
+
+<!-- Runners -->
+<div class="card bg-dark border-secondary mb-4">
+  <div class="card-header border-secondary">Runners & Results</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover mb-0">
+        <thead>
+          <tr>
+            <th>#</th><th>Horse</th><th>Trainer</th><th>SP</th>
+            <th>Weight</th><th>Jockey</th><th>Position</th><th>Btn</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @runners.each do |r| %>
+            <tr class="<%= r[:position] == 1 ? 'table-success' : '' %>">
+              <td><%= r[:cloth_number] %></td>
+              <td>
+                <a href="/horses/<%= r[:horse_id] %>" class="text-decoration-none">
+                  <%= r[:horse_name] %>
+                </a>
+              </td>
+              <td class="text-muted small"><%= r[:trainer] %></td>
+              <td>
+                <% sp = r[:sp].to_f %>
+                <span class="badge <%= sp <= 3.0 ? 'bg-warning text-dark' : sp <= 8.0 ? 'bg-primary' : 'bg-secondary' %>">
+                  <%= sp > 0 ? "%.1f" % sp : '—' %>
+                </span>
+              </td>
+              <td class="text-muted small"><%= r[:weight_lbs] %>lbs</td>
+              <td class="text-muted small"><%= r[:jockey] %></td>
+              <td>
+                <% if r[:position] %>
+                  <strong class="<%= r[:position] == 1 ? 'text-success' : '' %>">
+                    <%= r[:position] %>
+                  </strong>
+                <% else %>
+                  <span class="text-muted">—</span>
+                <% end %>
+              </td>
+              <td class="text-muted small">
+                <%= r[:btn_lengths] ? "%.1f" % r[:btn_lengths].to_f : '—' %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Odds History Chart -->
+<% if @odds_history.any? %>
+<div class="card bg-dark border-secondary">
+  <div class="card-header border-secondary">Odds Movement</div>
+  <div class="card-body">
+    <canvas id="oddsChart" height="120"></canvas>
+  </div>
+</div>
+
+<script>
+(function() {
+  var data = <%= @odds_history.to_json %>;
+  // Group by horse
+  var horses = {};
+  data.forEach(function(d) {
+    var k = d.horse_name;
+    if (!horses[k]) horses[k] = [];
+    horses[k].push({ x: -d.hours_before, y: d.odds });
+  });
+  var colors = ['#20c997','#6f42c1','#fd7e14','#0dcaf0','#ffc107','#dc3545','#0d6efd','#198754'];
+  var datasets = Object.keys(horses).map(function(name, i) {
+    var pts = horses[name].sort(function(a,b){ return a.x - b.x; });
+    return { label: name, data: pts, borderColor: colors[i % colors.length], fill: false, tension: 0.2, pointRadius: 2 };
+  });
+  new Chart(document.getElementById('oddsChart'), {
+    type: 'line',
+    data: { datasets: datasets },
+    options: {
+      parsing: false,
+      plugins: { legend: { labels: { color: '#adb5bd', boxWidth: 12 } } },
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'Hours before race', color: '#6c757d' },
+             ticks: { color: '#6c757d' }, grid: { color: '#343a40' } },
+        y: { title: { display: true, text: 'Odds', color: '#6c757d' },
+             ticks: { color: '#6c757d' }, grid: { color: '#343a40' } }
+      }
+    }
+  });
+})();
+</script>
+<% end %>

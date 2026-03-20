@@ -61,4 +61,9 @@ py/__pycache__/
 py/**/__pycache__/
 py/**/*.pyc
 py/data/*.db
+py/data/*.db-shm
+py/data/*.db-wal
 py/~/
+
+# Auth database (contains TOTP secrets — never commit)
+data/

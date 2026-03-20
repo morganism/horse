@@ -1,0 +1,134 @@
+<% @title = 'Dashboard' %>
+
+<div class="row mb-3">
+  <div class="col">
+    <h2 class="fw-bold"><i class="bi bi-speedometer2 text-warning me-2"></i>Dashboard</h2>
+    <% if @sim_days %>
+      <span class="text-muted">Simulation: Day <%= @sim_days[:first_day] %> – <%= @sim_days[:last_day] %>
+        (<%= @sim_days[:total_days] %> days)</span>
+    <% end %>
+  </div>
+</div>
+
+<% if @summary.nil? || @summary[:total_bets].to_i == 0 %>
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    No simulation data found. Run a simulation first via the
+    <a href="/simulation" class="alert-link">Simulation</a> page.
+  </div>
+<% else %>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small">Total P&L</div>
+        <div class="fs-3 fw-bold <%= @summary[:total_pl].to_f >= 0 ? 'text-success' : 'text-danger' %>">
+          £<%= "%.2f" % @summary[:total_pl].to_f %>
+        </div>
+        <div class="text-muted small">Staked: £<%= "%.2f" % @summary[:total_staked].to_f %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small">Total Bets</div>
+        <div class="fs-3 fw-bold text-info"><%= @summary[:total_bets] %></div>
+        <div class="text-muted small">Wins: <%= @summary[:total_wins] %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small">Strike Rate</div>
+        <% sr = @summary[:total_bets].to_f > 0 ? (@summary[:total_wins].to_f / @summary[:total_bets].to_f * 100) : 0 %>
+        <div class="fs-3 fw-bold text-primary"><%= "%.1f" % sr %>%</div>
+        <div class="text-muted small">Strategies: <%= @summary[:total_strategies] %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small">Overall ROI</div>
+        <% roi = @summary[:total_staked].to_f > 0 ? (@summary[:total_pl].to_f / @summary[:total_staked].to_f * 100) : 0 %>
+        <div class="fs-3 fw-bold <%= roi >= 0 ? 'text-success' : 'text-danger' %>">
+          <%= "%.1f" % roi %>%
+        </div>
+        <div class="text-muted small">Through day <%= @summary[:max_day] %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Daily P&L Chart -->
+<div class="row mb-4">
+  <div class="col-12 col-lg-8">
+    <div class="card bg-dark border-secondary">
+      <div class="card-header border-secondary">Daily P&L</div>
+      <div class="card-body">
+        <canvas id="dailyPlChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4 mt-3 mt-lg-0">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-header border-secondary">Top Strategies</div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          <% @top_strategies.each_with_index do |s, i| %>
+            <li class="list-group-item bg-dark border-secondary d-flex justify-content-between align-items-start">
+              <div>
+                <span class="badge bg-warning text-dark me-1">#<%= i+1 %></span>
+                <a href="/strategies/<%= s[:strategy_id] rescue '#' %>" class="text-decoration-none">
+                  <%= s[:variant_name] %>
+                </a>
+                <br><small class="text-muted"><%= s[:strategy_class] %></small>
+              </div>
+              <span class="badge <%= s[:roi].to_f >= 0 ? 'bg-success' : 'bg-danger' %>">
+                <%= "%.1f" % s[:roi].to_f %>%
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+      <div class="card-footer border-secondary text-end">
+        <a href="/strategies" class="btn btn-sm btn-outline-secondary">All strategies →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% end %>
+
+<script>
+(function() {
+  var series = <%= @daily_pl.to_json %>;
+  if (!series || !series.length) return;
+  var labels   = series.map(function(d){ return 'Day ' + d.sim_day; });
+  var plData   = series.map(function(d){ return parseFloat(d.pl) || 0; });
+  var cumPl    = [];
+  plData.reduce(function(acc, v, i){ cumPl[i] = acc + v; return acc + v; }, 0);
+
+  new Chart(document.getElementById('dailyPlChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Cumulative P&L', data: cumPl, borderColor: '#20c997', fill: false, tension: 0.3 },
+        { label: 'Daily P&L', data: plData, borderColor: '#6f42c1', fill: false, tension: 0.1, borderDash: [4,2] }
+      ]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#adb5bd' } } },
+      scales: {
+        x: { ticks: { color: '#6c757d', maxTicksLimit: 10 }, grid: { color: '#343a40' } },
+        y: { ticks: { color: '#6c757d' }, grid: { color: '#343a40' } }
+      }
+    }
+  });
+})();
+</script>

@@ -1,0 +1,114 @@
+<% @title = 'Correlations' %>
+
+<h2 class="fw-bold mb-4"><i class="bi bi-diagram-3 text-warning me-2"></i>Bayesian Correlations</h2>
+
+<!-- Hypothesis filter tabs -->
+<ul class="nav nav-tabs mb-4 border-secondary">
+  <% ['all', 'trainer_jockey', 'weight_drop', 'course_specialist'].each do |t| %>
+    <li class="nav-item">
+      <a class="nav-link <%= params[:type] == t || (params[:type].nil? && t == 'all') ? 'active bg-dark text-white' : 'text-muted' %>"
+         href="/correlations?type=<%= t %>">
+        <%= t.tr('_', ' ').capitalize %>
+      </a>
+    </li>
+  <% end %>
+</ul>
+
+<!-- Hypotheses table -->
+<div class="card bg-dark border-secondary mb-4">
+  <div class="card-header border-secondary">Hypotheses (evidence_count ≥ 3)</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover table-sm mb-0">
+        <thead>
+          <tr><th>Type</th><th>Subject</th><th>Confidence</th><th>Evidence</th><th>Alpha</th><th>Beta</th></tr>
+        </thead>
+        <tbody>
+          <% @hypotheses.each do |h| %>
+            <tr>
+              <td><span class="badge bg-secondary small"><%= h[:hypothesis_type] %></span></td>
+              <td class="font-monospace small"><%= h[:subject_key] %></td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar bg-info" style="width:<%= (h[:confidence].to_f * 100).round %>%"></div>
+                  </div>
+                  <span class="small"><%= "%.3f" % h[:confidence].to_f %></span>
+                </div>
+              </td>
+              <td class="text-muted small"><%= h[:evidence_count] %></td>
+              <td class="text-muted small"><%= h[:alpha] %></td>
+              <td class="text-muted small"><%= h[:beta_param] %></td>
+            </tr>
+          <% end %>
+          <% if @hypotheses.empty? %>
+            <tr><td colspan="6" class="text-muted text-center py-3">No hypotheses yet — run more simulation days.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Beta Horses (dominant pairs) -->
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-header border-secondary">
+        <i class="bi bi-trophy me-1"></i>Dominant H2H Pairs
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm mb-0">
+          <thead><tr><th>Horse A</th><th>Horse B</th><th class="text-end">Meetings</th><th class="text-end">Dominance</th></tr></thead>
+          <tbody>
+            <% @beta_horses.each do |b| %>
+              <tr>
+                <td class="small"><%= b[:horse_a] %></td>
+                <td class="small text-muted"><%= b[:horse_b] %></td>
+                <td class="text-end small"><%= b[:meetings] %></td>
+                <td class="text-end">
+                  <span class="badge <%= b[:dominance].to_f >= 0.9 ? 'bg-danger' : 'bg-warning text-dark' %>">
+                    <%= "%.0f" % (b[:dominance].to_f * 100) %>%
+                  </span>
+                </td>
+              </tr>
+            <% end %>
+            <% if @beta_horses.empty? %>
+              <tr><td colspan="4" class="text-muted text-center py-3">No dominant pairs yet.</td></tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card bg-dark border-secondary h-100">
+      <div class="card-header border-secondary">
+        <i class="bi bi-person-badge me-1"></i>Top Trainer-Jockey Combos
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm mb-0">
+          <thead><tr><th>Trainer</th><th>Jockey</th><th class="text-end">Runs</th><th class="text-end">Win%</th></tr></thead>
+          <tbody>
+            <% @trainer_jockey.each do |tj| %>
+              <tr>
+                <td class="small"><%= tj[:trainer] %></td>
+                <td class="small text-muted"><%= tj[:jockey] %></td>
+                <td class="text-end small"><%= tj[:runs] %></td>
+                <td class="text-end">
+                  <span class="badge <%= tj[:win_rate].to_f >= 0.4 ? 'bg-success' : tj[:win_rate].to_f >= 0.2 ? 'bg-warning text-dark' : 'bg-secondary' %>">
+                    <%= "%.0f" % (tj[:win_rate].to_f * 100) %>%
+                  </span>
+                </td>
+              </tr>
+            <% end %>
+            <% if @trainer_jockey.empty? %>
+              <tr><td colspan="4" class="text-muted text-center py-3">No combo stats yet.</td></tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

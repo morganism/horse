@@ -1,0 +1,122 @@
+<% @title = 'Simulation' %>
+
+<h2 class="fw-bold mb-4"><i class="bi bi-play-circle text-warning me-2"></i>Simulation Controls</h2>
+
+<div class="row g-4">
+  <!-- Run simulation -->
+  <div class="col-md-6">
+    <div class="card bg-dark border-secondary">
+      <div class="card-header border-secondary">Run Simulation</div>
+      <div class="card-body">
+        <p class="text-muted small">Generates synthetic race data and evaluates all 275+ strategy variants.</p>
+        <div class="mb-3">
+          <label class="form-label">Days to simulate</label>
+          <select id="simDays" class="form-select bg-dark text-white border-secondary" style="max-width:160px">
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+        <button id="btnSimulate" class="btn btn-warning fw-bold">
+          <i class="bi bi-play-fill me-1"></i>Start Simulation
+        </button>
+        <div id="simStatus" class="mt-3" style="display:none">
+          <div class="progress mb-2" style="height:8px">
+            <div id="simProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" style="width:0%"></div>
+          </div>
+          <pre id="simLog" class="bg-black text-success p-2 rounded small" style="max-height:300px;overflow-y:auto;font-size:0.75rem"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset database -->
+  <div class="col-md-6">
+    <div class="card bg-dark border-danger">
+      <div class="card-header border-danger text-danger">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>Danger Zone
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Reset drops all simulation data from the database (races, bets, performance).
+          Strategy definitions are retained.
+        </p>
+        <button id="btnReset" class="btn btn-outline-danger">
+          <i class="bi bi-trash3 me-1"></i>Reset Database
+        </button>
+        <div id="resetConfirm" class="mt-3" style="display:none">
+          <div class="alert alert-danger py-2">
+            <strong>Are you sure?</strong> This cannot be undone.
+          </div>
+          <button id="btnResetConfirm" class="btn btn-danger me-2">Yes, reset</button>
+          <button id="btnResetCancel" class="btn btn-secondary">Cancel</button>
+          <pre id="resetLog" class="bg-black text-danger p-2 rounded small mt-2" style="max-height:150px;overflow-y:auto;font-size:0.75rem"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var btnSim   = document.getElementById('btnSimulate');
+  var simStatus = document.getElementById('simStatus');
+  var simLog   = document.getElementById('simLog');
+  var simProg  = document.getElementById('simProgress');
+
+  btnSim.addEventListener('click', function() {
+    var days = document.getElementById('simDays').value;
+    btnSim.disabled = true;
+    simStatus.style.display = 'block';
+    simLog.textContent = '';
+    simProg.style.width = '5%';
+
+    fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: parseInt(days) })
+    }).then(function(res) {
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var pct = 5;
+      function pump() {
+        reader.read().then(function(chunk) {
+          if (chunk.done) {
+            simProg.style.width = '100%';
+            simProg.classList.remove('progress-bar-animated');
+            btnSim.disabled = false;
+            return;
+          }
+          var text = decoder.decode(chunk.value);
+          simLog.textContent += text;
+          simLog.scrollTop = simLog.scrollHeight;
+          pct = Math.min(95, pct + 2);
+          simProg.style.width = pct + '%';
+          pump();
+        });
+      }
+      pump();
+    }).catch(function(e) {
+      simLog.textContent += '\nError: ' + e.message;
+      btnSim.disabled = false;
+    });
+  });
+
+  var btnReset = document.getElementById('btnReset');
+  var resetConfirm = document.getElementById('resetConfirm');
+  var resetLog = document.getElementById('resetLog');
+  btnReset.addEventListener('click', function() { resetConfirm.style.display = 'block'; });
+  document.getElementById('btnResetCancel').addEventListener('click', function() {
+    resetConfirm.style.display = 'none';
+  });
+  document.getElementById('btnResetConfirm').addEventListener('click', function() {
+    resetLog.textContent = 'Resetting…';
+    fetch('/api/reset', { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        resetLog.textContent = d.success ? 'Done. Database reset.' : 'Error: ' + d.error;
+        if (d.success) { setTimeout(function(){ location.href='/'; }, 2000); }
+      });
+  });
+})();
+</script>

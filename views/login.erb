@@ -1,0 +1,33 @@
+<div class="row justify-content-center mt-5">
+  <div class="col-md-4">
+    <div class="card bg-dark border-secondary shadow">
+      <div class="card-body p-4">
+        <h4 class="card-title text-center mb-4">
+          <i class="bi bi-shield-lock-fill text-warning me-2"></i>Sign In
+        </h4>
+        <% if @error %>
+          <div class="alert alert-danger py-2"><%= @error %></div>
+        <% end %>
+        <form method="POST" action="/login">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" name="username" class="form-control bg-dark text-white border-secondary"
+                   value="<%= @username %>" autofocus required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">TOTP Code</label>
+            <input type="text" name="code" class="form-control bg-dark text-white border-secondary font-monospace"
+                   inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required>
+            <div class="form-text">6-digit code from your authenticator app</div>
+          </div>
+          <button type="submit" class="btn btn-warning w-100 fw-bold">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+          </button>
+        </form>
+      </div>
+    </div>
+    <p class="text-center text-muted mt-3">
+      <small>First time? Run <code>ruby setup_auth.rb &lt;username&gt;</code> to provision access.</small>
+    </p>
+  </div>
+</div>

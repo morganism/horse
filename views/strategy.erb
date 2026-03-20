@@ -1,0 +1,126 @@
+<% @title = @strategy[:variant_name] %>
+
+<div class="mb-3">
+  <a href="/strategies" class="btn btn-sm btn-outline-secondary">← Strategies</a>
+</div>
+
+<div class="row mb-4">
+  <div class="col">
+    <h3 class="fw-bold"><%= @strategy[:variant_name] %></h3>
+    <span class="badge bg-secondary me-2"><%= @strategy[:strategy_class] %></span>
+    <span class="text-muted small">Created: <%= @strategy[:created_at] %></span>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <% [
+    ['ROI', "%.1f%%" % @strategy[:roi].to_f, @strategy[:roi].to_f >= 0 ? 'text-success' : 'text-danger'],
+    ['P&L', "£%.2f" % @strategy[:profit_loss].to_f, @strategy[:profit_loss].to_f >= 0 ? 'text-success' : 'text-danger'],
+    ['Bets', @strategy[:total_bets], 'text-info'],
+    ['Strike Rate', "%.1f%%" % (@strategy[:total_bets].to_f > 0 ? @strategy[:wins].to_f / @strategy[:total_bets].to_f * 100 : 0), 'text-primary'],
+    ['Sharpe', @strategy[:sharpe] ? "%.2f" % @strategy[:sharpe].to_f : '—', @strategy[:sharpe].to_f >= 1 ? 'text-success' : ''],
+    ['Max Drawdown', @strategy[:max_drawdown] ? "%.1f%%" % @strategy[:max_drawdown].to_f : '—', 'text-warning'],
+  ].each do |label, val, cls| %>
+    <div class="col-6 col-md-2">
+      <div class="card bg-dark border-secondary text-center p-2">
+        <div class="text-muted small"><%= label %></div>
+        <div class="fs-5 fw-bold <%= cls %>"><%= val %></div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<!-- Params -->
+<% if @strategy[:params_json] %>
+<div class="card bg-dark border-secondary mb-4">
+  <div class="card-header border-secondary">Parameters</div>
+  <div class="card-body">
+    <% params_h = JSON.parse(@strategy[:params_json]) rescue {} %>
+    <div class="row g-2">
+      <% params_h.each do |k, v| %>
+        <div class="col-6 col-md-3">
+          <span class="text-muted small"><%= k %>:</span>
+          <strong class="small ms-1"><%= v %></strong>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<!-- Daily P&L Chart -->
+<% if @daily_pl.any? %>
+<div class="card bg-dark border-secondary mb-4">
+  <div class="card-header border-secondary">Daily P&L</div>
+  <div class="card-body">
+    <canvas id="strategyPlChart" height="100"></canvas>
+  </div>
+</div>
+<script>
+(function() {
+  var data = <%= @daily_pl.to_json %>;
+  var labels = data.map(function(d){ return 'Day ' + d.sim_day; });
+  var pl     = data.map(function(d){ return parseFloat(d.pl) || 0; });
+  var cumPl  = []; pl.reduce(function(a,v,i){ cumPl[i]=a+v; return a+v; }, 0);
+  new Chart(document.getElementById('strategyPlChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Daily P&L', data: pl, backgroundColor: pl.map(function(v){ return v>=0?'rgba(32,201,151,0.5)':'rgba(220,53,69,0.5)'; }), yAxisID: 'y' },
+        { label: 'Cumulative P&L', data: cumPl, type: 'line', borderColor: '#6f42c1', fill: false, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#adb5bd' } } },
+      scales: {
+        x: { ticks: { color: '#6c757d', maxTicksLimit: 10 }, grid: { color: '#343a40' } },
+        y:  { ticks: { color: '#6c757d' }, grid: { color: '#343a40' }, position: 'left' },
+        y2: { ticks: { color: '#adb5bd' }, grid: { display: false }, position: 'right' }
+      }
+    }
+  });
+})();
+</script>
+<% end %>
+
+<!-- Recent Bets -->
+<div class="card bg-dark border-secondary">
+  <div class="card-header border-secondary">Recent Bets</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Day</th><th>Date</th><th>Venue</th><th>Type</th>
+            <th>Stake</th><th>Status</th><th>Payout</th><th>P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @recent_bets.each do |b| %>
+            <tr class="<%= b[:status] == 'won' ? 'table-success' : b[:status] == 'lost' ? 'table-danger' : '' %>">
+              <td class="small"><%= b[:race_sim_day] rescue '—' %></td>
+              <td class="small"><%= b[:race_date] %></td>
+              <td class="small"><%= b[:venue_name] %></td>
+              <td class="small"><span class="badge bg-secondary"><%= b[:bet_type] %></span></td>
+              <td class="small">£<%= "%.2f" % b[:stake].to_f %></td>
+              <td>
+                <span class="badge <%= b[:status] == 'won' ? 'bg-success' : b[:status] == 'lost' ? 'bg-danger' : 'bg-secondary' %>">
+                  <%= b[:status] %>
+                </span>
+              </td>
+              <td class="small">
+                <%= b[:payout] ? "£%.2f" % b[:payout].to_f : '—' %>
+              </td>
+              <td class="small <%= b[:status] == 'won' ? 'text-success' : 'text-danger' %>">
+                <% pl = (b[:payout].to_f || 0) - b[:stake].to_f %>
+                <%= b[:status] == 'pending' ? '—' : "£%.2f" % pl %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
