@@ -212,15 +212,16 @@ get '/calendar/:date' do
   end
   @races     = db.races_on_date(@date.iso8601)
   @db_latest = Date.parse(db.latest_race_date)
-  @is_latest = @date == @db_latest   # "today" in sim terms — latest data day
+  @is_latest = @date == @db_latest   # latest sim day — also run strategy matcher
+  @is_real   = @date > @db_latest    # beyond sim data — real-world race day
 
-  # Load strategy P&L for all dates that have data
+  # Load strategy P&L for sim dates that have data
   @race_strategies = {}
   @races.each do |race|
     @race_strategies[race[:id]] = db.race_strategy_performance(race[:id])
   end
 
-  # On the latest sim day, also run strategy matcher
+  # On the latest sim day, run strategy matcher
   if @is_latest
     hypos = db.hypothesis(min_evidence: 3, limit: 300)
     @match_results = {}
@@ -228,8 +229,10 @@ get '/calendar/:date' do
       runners = db.race_runners(race[:id])
       @match_results[race[:id]] = StrategyMatcher.new(runners, hypos).suggestions
     end
-    @predictions = db.real_race_predictions(date: @date.iso8601)
   end
+
+  # Always load real-race predictions for the date (sim or real)
+  @predictions = db.real_race_predictions(date: @date.iso8601)
 
   erb :calendar_day
 end

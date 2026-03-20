@@ -4,8 +4,10 @@
   <h2 class="fw-bold mb-0">
     <i class="bi bi-calendar-day text-warning me-2"></i>
     <%= @date.strftime('%A, %d %B %Y') %>
-    <% if @is_latest %>
-      <span class="badge bg-warning text-dark ms-2">LATEST</span>
+    <% if @date == Date.today %>
+      <span class="badge bg-info text-dark ms-2">TODAY</span>
+    <% elsif @is_latest %>
+      <span class="badge bg-warning text-dark ms-2">SIM LATEST</span>
     <% end %>
   </h2>
   <a href="/calendar?year=<%= @date.year %>&month=<%= @date.month %>"
@@ -14,9 +16,131 @@
   </a>
 </div>
 
-<% if @races.empty? %>
+<!-- ── Always show saved predictions for this date ──────────────────────── -->
+<% if @predictions&.any? %>
+  <div class="mb-4">
+    <h5 class="text-info"><i class="bi bi-bookmark-check me-1"></i>Real Bets — <%= @date.strftime('%d %b %Y') %></h5>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover table-sm">
+        <thead>
+          <tr>
+            <th>Time</th><th>Horse</th><th>Venue</th><th>Strategy</th><th>Bet</th>
+            <th class="text-end">Stake%</th><th class="text-end">SP</th><th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @predictions.each do |p| %>
+            <tr>
+              <td><span class="badge bg-secondary"><%= p[:race_time] %></span></td>
+              <td class="fw-bold"><%= p[:horse_name] %></td>
+              <td class="small text-muted"><%= p[:venue] %></td>
+              <td><span class="badge bg-primary small"><%= p[:strategy_class] %></span></td>
+              <td><span class="badge bg-dark border border-secondary text-info small"><%= p[:bet_type] %></span></td>
+              <td class="text-end text-warning fw-bold"><%= "%.1f" % p[:stake_pct].to_f %>%</td>
+              <td class="text-end"><%= p[:sp_at_tip] ? "%.2f" % p[:sp_at_tip].to_f : '—' %></td>
+              <td>
+                <% if p[:settled].to_i == 1 %>
+                  <span class="badge <%= p[:profit_loss].to_f >= 0 ? 'bg-success' : 'bg-danger' %>">
+                    <%= p[:profit_loss].to_f >= 0 ? '+' : '' %>£<%= "%.2f" % p[:profit_loss].to_f %>
+                  </span>
+                <% else %>
+                  <span class="badge bg-secondary">Pending</span>
+                  <button class="btn btn-xs btn-sm btn-outline-success py-0 settle-btn ms-1"
+                          data-pred-id="<%= p[:id] %>">Settle</button>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+        <% settled = @predictions.select { |p| p[:settled].to_i == 1 } %>
+        <% if settled.any? %>
+          <tfoot>
+            <tr class="text-end">
+              <td colspan="7" class="text-muted small">Total P&L:</td>
+              <td>
+                <% total_pl = settled.sum { |p| p[:profit_loss].to_f } %>
+                <span class="fw-bold <%= total_pl >= 0 ? 'text-success' : 'text-danger' %>">
+                  <%= total_pl >= 0 ? '+' : '' %>£<%= "%.2f" % total_pl %>
+                </span>
+              </td>
+            </tr>
+          </tfoot>
+        <% end %>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<!-- ── Real-world date: manual bet entry form ────────────────────────────── -->
+<% if @is_real %>
+  <div class="card bg-dark border-info mb-4">
+    <div class="card-header border-info">
+      <h5 class="mb-0 text-info"><i class="bi bi-pencil-square me-2"></i>Log a Real Bet</h5>
+    </div>
+    <div class="card-body">
+      <form id="real-bet-form" class="row g-2">
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Time</label>
+          <input type="time" class="form-control form-control-sm bg-dark text-light border-secondary"
+                 id="rb-time" placeholder="14:30" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">Venue</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
+                 id="rb-venue" placeholder="e.g. Musselburgh" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">Horse</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
+                 id="rb-horse" placeholder="Horse name" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Strategy</label>
+          <select class="form-select form-select-sm bg-dark text-light border-secondary" id="rb-strategy">
+            <option>FavouriteCover</option>
+            <option>DutchingEnvelope</option>
+            <option>PatternRecognition</option>
+            <option>BayesianCorrelation</option>
+            <option>Manual</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Bet type</label>
+          <select class="form-select form-select-sm bg-dark text-light border-secondary" id="rb-bet-type">
+            <option value="win">Win</option>
+            <option value="each_way">Each Way</option>
+            <option value="dutch">Dutch</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">SP / Odds</label>
+          <input type="number" step="0.01" class="form-control form-control-sm bg-dark text-light border-secondary"
+                 id="rb-sp" placeholder="4.50">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Stake %</label>
+          <input type="number" step="0.5" value="2.0" class="form-control form-control-sm bg-dark text-light border-secondary"
+                 id="rb-stake-pct">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Confidence</label>
+          <input type="number" step="0.05" min="0" max="1" value="0.60"
+                 class="form-control form-control-sm bg-dark text-light border-secondary" id="rb-confidence">
+        </div>
+        <div class="col-12 mt-1">
+          <button type="submit" class="btn btn-info btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Save Bet
+          </button>
+          <span id="rb-msg" class="ms-3 small"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+<% end %>
+
+<% if @races.empty? && !@is_real %>
   <div class="alert alert-secondary">No races found for this date.</div>
-<% else %>
+<% elsif !@races.empty? %>
 
   <% if @is_latest && @match_results %>
     <!-- ── Today: strategy matcher suggestions ─────────────────────────── -->
@@ -248,5 +372,40 @@
       body: JSON.stringify({ actual_position: parseInt(pos), profit_loss: parseFloat(pl) })
     }).then(function () { location.reload(); });
   });
+
+  // Manual real-bet form submit
+  var form = document.getElementById('real-bet-form');
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var msg = document.getElementById('rb-msg');
+      var payload = {
+        race_date:      '<%= @date.iso8601 %>',
+        venue:          document.getElementById('rb-venue').value.trim(),
+        race_time:      document.getElementById('rb-time').value,
+        horse_name:     document.getElementById('rb-horse').value.trim(),
+        strategy_class: document.getElementById('rb-strategy').value,
+        bet_type:       document.getElementById('rb-bet-type').value,
+        stake_pct:      parseFloat(document.getElementById('rb-stake-pct').value) || 2.0,
+        confidence:     parseFloat(document.getElementById('rb-confidence').value) || null,
+        sp_at_tip:      parseFloat(document.getElementById('rb-sp').value) || null
+      };
+      fetch('/api/predictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); })
+        .then(function (data) {
+          msg.className = 'ms-3 small text-success';
+          msg.textContent = '✓ Saved (id=' + data.id + ')';
+          form.reset();
+          setTimeout(function () { location.reload(); }, 800);
+        })
+        .catch(function () {
+          msg.className = 'ms-3 small text-danger';
+          msg.textContent = 'Error saving';
+        });
+    });
+  }
 }());
 </script>

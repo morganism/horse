@@ -6,12 +6,13 @@
   last_day   = Date.new(@year, @month, -1)
   prev_month = first_day - 1
   next_month = last_day  + 1
+  real_today = Date.today
+  real_today_ds = real_today.iso8601
 
   # Build lookup: "YYYY-MM-DD" => { race_count:, venues: }
   day_data   = {}
   @race_days.each { |r| day_data[r[:race_date]] = r }
 
-  # "today" = latest sim day, not wall-clock
   latest_ds  = @db_latest.iso8601
 %>
 
@@ -26,7 +27,13 @@
       &laquo; <%= prev_month.strftime('%b') %>
     </a>
     <% if @year != @db_latest.year || @month != @db_latest.month %>
-      <a class="btn btn-sm btn-outline-warning me-1" href="/calendar">Latest</a>
+      <a class="btn btn-sm btn-outline-warning me-1" href="/calendar">Sim Latest</a>
+    <% end %>
+    <% unless @year == real_today.year && @month == real_today.month %>
+      <a class="btn btn-sm btn-outline-info me-1"
+         href="/calendar?year=<%= real_today.year %>&month=<%= real_today.month %>">
+        Today
+      </a>
     <% end %>
     <a class="btn btn-sm btn-outline-secondary"
        href="/calendar?year=<%= next_month.year %>&month=<%= next_month.month %>">
@@ -35,11 +42,18 @@
   </div>
 </div>
 
-<% if @race_days.empty? %>
+<% if @race_days.empty? && first_day > Date.new(@db_latest.year, @db_latest.month, 1) %>
+  <div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span>
+      <i class="bi bi-pencil-square me-2"></i>
+      No sim data for <%= first_day.strftime('%B %Y') %> — click any day to log real race bets.
+    </span>
+    <a href="/calendar/<%= real_today_ds %>" class="btn btn-sm btn-info">Log today's bets</a>
+  </div>
+<% elsif @race_days.empty? %>
   <div class="alert alert-secondary">
     No race data for <%= first_day.strftime('%B %Y') %>.
-    <a href="/calendar" class="alert-link">Go to latest data</a>
-    (<%= @db_latest.strftime('%B %Y') %>).
+    <a href="/calendar" class="alert-link">Go to sim latest</a> (<%= @db_latest.strftime('%B %Y') %>).
   </div>
 <% end %>
 
@@ -69,18 +83,28 @@
                 ds         = day.iso8601
                 data       = day_data[ds]
                 is_latest  = ds == latest_ds
-                is_future  = ds > latest_ds   # after last sim day = no data yet
+                is_real_today = ds == real_today_ds
+                is_beyond  = ds > latest_ds && !is_real_today  # future with no data and not today
                 is_past    = ds < latest_ds
-                td_class   = is_latest ? 'border border-warning' : ''
-                td_style   = is_future ? 'opacity:0.45' : ''
+
+                if is_real_today
+                  td_class = 'border border-info'
+                elsif is_latest
+                  td_class = 'border border-warning'
+                else
+                  td_class = ''
+                end
+                td_style = is_beyond ? 'opacity:0.45' : ''
               %>
               <td class="<%= td_class %> p-1 position-relative" style="<%= td_style %>">
                 <div class="d-flex justify-content-between align-items-start">
-                  <span class="small fw-bold <%= is_latest ? 'text-warning' : 'text-muted' %>">
+                  <span class="small fw-bold <%= is_real_today ? 'text-info' : is_latest ? 'text-warning' : 'text-muted' %>">
                     <%= day.day %>
                   </span>
-                  <% if is_latest %>
-                    <span class="badge bg-warning text-dark" style="font-size:0.6rem">LATEST</span>
+                  <% if is_real_today %>
+                    <span class="badge bg-info text-dark" style="font-size:0.6rem">TODAY</span>
+                  <% elsif is_latest %>
+                    <span class="badge bg-warning text-dark" style="font-size:0.6rem">SIM</span>
                   <% end %>
                 </div>
                 <% if data %>
@@ -95,7 +119,13 @@
                       </small>
                     <% end %>
                   </a>
-                <% elsif is_future %>
+                <% elsif is_real_today %>
+                  <a href="/calendar/<%= ds %>" class="text-decoration-none d-block mt-1">
+                    <span class="badge bg-info text-dark w-100" style="font-size:0.65rem">
+                      <i class="bi bi-pencil-square me-1"></i>log bets
+                    </span>
+                  </a>
+                <% elsif is_beyond %>
                   <small class="text-muted" style="font-size:0.65rem">no data</small>
                 <% end %>
               </td>
@@ -109,9 +139,10 @@
 
 <div class="row mt-3">
   <div class="col-auto small text-muted">
-    <span class="badge bg-warning text-dark me-1">LATEST</span> Most recent sim day &nbsp;
-    <span class="badge bg-secondary me-1">Past</span> Race day with data &nbsp;
+    <span class="badge bg-info text-dark me-1">TODAY</span> Real today — log bets &nbsp;
+    <span class="badge bg-warning text-dark me-1">SIM</span> Latest sim day &nbsp;
+    <span class="badge bg-secondary me-1">Past</span> Sim race day &nbsp;
     <span class="badge bg-dark border border-secondary">Future</span> Beyond sim range
-    <span class="ms-3">Sim data: <%= @db_latest.strftime('%d %b %Y') %></span>
+    <span class="ms-3 text-muted">Sim data ends: <%= @db_latest.strftime('%d %b %Y') %></span>
   </div>
 </div>
