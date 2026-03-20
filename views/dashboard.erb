@@ -83,7 +83,7 @@
             <li class="list-group-item bg-dark border-secondary d-flex justify-content-between align-items-start">
               <div>
                 <span class="badge bg-warning text-dark me-1">#<%= i+1 %></span>
-                <a href="/strategies/<%= s[:strategy_id] rescue '#' %>" class="text-decoration-none">
+                <a href="/strategies/<%= s[:strategy_id] %>" class="text-decoration-none">
                   <%= s[:variant_name] %>
                 </a>
                 <br><small class="text-muted"><%= s[:strategy_class] %></small>

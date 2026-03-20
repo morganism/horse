@@ -248,7 +248,7 @@ class DBReader
 
   def top_strategies(n: 5)
     query(<<~SQL, n)
-      SELECT sp.roi, sp.profit_loss, sp.total_bets, sp.wins,
+      SELECT s.id AS strategy_id, sp.roi, sp.profit_loss, sp.total_bets, sp.wins,
              s.strategy_class, s.variant_name
       FROM strategy_performance sp
       JOIN strategies s ON sp.strategy_id = s.id
