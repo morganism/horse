@@ -1,0 +1,252 @@
+<% @title = @date.strftime('%d %b %Y') + ' Races' %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="fw-bold mb-0">
+    <i class="bi bi-calendar-day text-warning me-2"></i>
+    <%= @date.strftime('%A, %d %B %Y') %>
+    <% if @is_today %>
+      <span class="badge bg-warning text-dark ms-2">TODAY</span>
+    <% end %>
+  </h2>
+  <a href="/calendar?year=<%= @date.year %>&month=<%= @date.month %>"
+     class="btn btn-sm btn-outline-secondary">
+    &laquo; Calendar
+  </a>
+</div>
+
+<% if @races.empty? %>
+  <div class="alert alert-secondary">No races found for this date.</div>
+<% else %>
+
+  <% if @is_today && @match_results %>
+    <!-- ── Today: strategy matcher suggestions ─────────────────────────── -->
+    <div class="mb-4">
+      <h5 class="text-warning"><i class="bi bi-lightning-charge me-1"></i>Strategy Matcher — Suggested Bets</h5>
+      <p class="text-muted small">Top-4 strategies applied live. Confidence ≥ 0.50 shown. Save to predictions table to track real-money results.</p>
+
+      <%
+        all_suggestions = @match_results.values.flatten.select { |s| s.confidence >= 0.50 }
+                            .sort_by { |s| -s.confidence }
+      %>
+
+      <% if all_suggestions.empty? %>
+        <div class="alert alert-secondary small">No high-confidence bets found for today's card.</div>
+      <% else %>
+        <div class="table-responsive mb-3">
+          <table class="table table-dark table-hover table-sm" id="suggestions-table">
+            <thead>
+              <tr>
+                <th>Time</th><th>Horse</th><th>Strategy</th><th>Bet</th>
+                <th class="text-end">SP</th><th class="text-end">Stake%</th>
+                <th class="text-end">Conf</th><th>Rationale</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @races.each do |race| %>
+                <% suggs = (@match_results[race[:id]] || []).select { |s| s.confidence >= 0.50 } %>
+                <% suggs.each do |s| %>
+                  <tr>
+                    <td><span class="badge bg-secondary"><%= race[:race_time] %></span></td>
+                    <td class="fw-bold">#<%= s.cloth_number %> <%= s.horse_name %></td>
+                    <td>
+                      <span class="badge bg-primary small"><%= s.strategy_class %></span>
+                    </td>
+                    <td><span class="badge bg-dark border border-secondary text-info"><%= s.bet_type %></span></td>
+                    <td class="text-end"><%= s.sp ? "%.2f" % s.sp : '—' %></td>
+                    <td class="text-end fw-bold text-warning"><%= "%.1f" % s.stake_pct %>%</td>
+                    <td class="text-end">
+                      <% conf_class = s.confidence >= 0.70 ? 'text-success' : s.confidence >= 0.55 ? 'text-warning' : 'text-muted' %>
+                      <span class="<%= conf_class %>"><%= "%.0f" % (s.confidence * 100) %>%</span>
+                    </td>
+                    <td class="small text-muted"><%= s.rationale %></td>
+                    <td>
+                      <button class="btn btn-xs btn-sm btn-outline-warning py-0 save-pred-btn"
+                              data-race-date="<%= @date.iso8601 %>"
+                              data-venue="<%= race[:venue_name] %>"
+                              data-race-time="<%= race[:race_time] %>"
+                              data-horse="<%= s.horse_name %>"
+                              data-strategy="<%= s.strategy_class %>"
+                              data-bet-type="<%= s.bet_type %>"
+                              data-stake-pct="<%= s.stake_pct %>"
+                              data-confidence="<%= s.confidence %>"
+                              data-sp="<%= s.sp %>">
+                        Save
+                      </button>
+                    </td>
+                  </tr>
+                <% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+        <% if @predictions&.any? %>
+          <h6 class="text-info">Saved Predictions for Today</h6>
+          <div class="table-responsive">
+            <table class="table table-dark table-sm">
+              <thead>
+                <tr>
+                  <th>Time</th><th>Horse</th><th>Strategy</th><th>Bet</th>
+                  <th class="text-end">Stake%</th><th class="text-end">Conf</th>
+                  <th class="text-end">SP</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @predictions.each do |p| %>
+                  <tr>
+                    <td><%= p[:race_time] %></td>
+                    <td class="fw-bold"><%= p[:horse_name] %></td>
+                    <td><span class="badge bg-primary small"><%= p[:strategy_class] %></span></td>
+                    <td><%= p[:bet_type] %></td>
+                    <td class="text-end"><%= "%.1f" % p[:stake_pct].to_f %>%</td>
+                    <td class="text-end"><%= p[:confidence] ? "%.0f%%" % (p[:confidence].to_f * 100) : '—' %></td>
+                    <td class="text-end"><%= p[:sp_at_tip] ? "%.2f" % p[:sp_at_tip].to_f : '—' %></td>
+                    <td>
+                      <% if p[:settled].to_i == 1 %>
+                        <span class="badge <%= p[:profit_loss].to_f >= 0 ? 'bg-success' : 'bg-danger' %>">
+                          <%= p[:profit_loss].to_f >= 0 ? '+' : '' %><%= "%.2f" % p[:profit_loss].to_f %>
+                        </span>
+                      <% else %>
+                        <span class="badge bg-secondary">Pending</span>
+                        <button class="btn btn-xs btn-sm btn-outline-success py-0 settle-btn ms-1"
+                                data-pred-id="<%= p[:id] %>">Settle</button>
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <!-- ── Race card ──────────────────────────────────────────────────────── -->
+  <h5 class="<%= @is_today ? 'text-info' : 'text-warning' %> mb-3">
+    <i class="bi bi-flag me-1"></i>
+    Race Card (<%= @races.size %> race<%= @races.size == 1 ? '' : 's' %>)
+  </h5>
+
+  <% @races.each do |race| %>
+    <%
+      is_future = @date > Date.today
+      strats    = @race_strategies&.dig(race[:id])
+    %>
+    <div class="card bg-dark border-secondary mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <div>
+          <span class="badge bg-secondary me-1"><%= race[:race_time] %></span>
+          <strong><%= race[:venue_name] %></strong>
+          <small class="text-muted ms-1">(<%= race[:country] %>)</small>
+          <span class="badge <%= race[:race_type] == 'flat' ? 'bg-info' : 'bg-warning text-dark' %> ms-1">
+            <%= race[:race_type] %>
+          </span>
+          <% if race[:race_name] && !race[:race_name].empty? %>
+            <span class="text-muted ms-2 small"><%= race[:race_name] %></span>
+          <% end %>
+        </div>
+        <div class="small text-muted">
+          <%= race[:distance_furlongs] %>f · <%= race[:going] %> · <%= race[:runner_count] %> runners
+        </div>
+      </div>
+
+      <% if !is_future && strats&.any? %>
+        <div class="card-body py-2">
+          <h6 class="text-muted small mb-2">Strategies by P&amp;L per unit</h6>
+          <div class="table-responsive">
+            <table class="table table-dark table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Strategy</th><th>Variant</th>
+                  <th class="text-end">Bets</th>
+                  <th class="text-end">Staked</th>
+                  <th class="text-end">P&amp;L</th>
+                  <th class="text-end">P&amp;L/unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% strats.first(8).each do |s| %>
+                  <tr>
+                    <td><span class="badge bg-secondary small"><%= s[:strategy_class] %></span></td>
+                    <td class="small text-muted"><%= s[:variant_name] %></td>
+                    <td class="text-end small"><%= s[:bets] %></td>
+                    <td class="text-end small">£<%= "%.2f" % s[:staked].to_f %></td>
+                    <td class="text-end small <%= s[:pl].to_f >= 0 ? 'text-success' : 'text-danger' %>">
+                      <%= s[:pl].to_f >= 0 ? '+' : '' %>£<%= "%.2f" % s[:pl].to_f %>
+                    </td>
+                    <td class="text-end small fw-bold <%= s[:pl_per_unit].to_f >= 0 ? 'text-success' : 'text-danger' %>">
+                      <%= s[:pl_per_unit] ? "%.3f" % s[:pl_per_unit].to_f : '—' %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+          <a href="/races/<%= race[:id] %>" class="btn btn-sm btn-outline-secondary mt-2 py-0">
+            View full race →
+          </a>
+        </div>
+      <% elsif !is_future %>
+        <div class="card-body py-2">
+          <small class="text-muted">No strategy bets recorded for this race.</small>
+          <a href="/races/<%= race[:id] %>" class="btn btn-sm btn-outline-secondary ms-2 py-0">View race</a>
+        </div>
+      <% else %>
+        <div class="card-body py-2 text-muted small">
+          Future race — no results available yet.
+          <a href="/races/<%= race[:id] %>" class="btn btn-sm btn-outline-secondary ms-2 py-0">View card</a>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+<% end %>
+
+<!-- Save prediction + settle modals / JS -->
+<script>
+(function () {
+  // Save prediction
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.save-pred-btn');
+    if (!btn) return;
+    var d = btn.dataset;
+    fetch('/api/predictions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        race_date:      d.raceDate,
+        venue:          d.venue,
+        race_time:      d.raceTime,
+        horse_name:     d.horse,
+        strategy_class: d.strategy,
+        bet_type:       d.betType,
+        stake_pct:      parseFloat(d.stakePct),
+        confidence:     parseFloat(d.confidence),
+        sp_at_tip:      parseFloat(d.sp) || null
+      })
+    }).then(function (r) { return r.json(); })
+      .then(function () {
+        btn.textContent = '✓ Saved';
+        btn.disabled = true;
+        btn.classList.replace('btn-outline-warning', 'btn-success');
+      })
+      .catch(function () { btn.textContent = 'Error'; });
+  });
+
+  // Settle prediction
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.settle-btn');
+    if (!btn) return;
+    var pos = prompt('Actual finishing position:');
+    if (!pos || isNaN(parseInt(pos))) return;
+    var pl  = prompt('Profit/loss (£, e.g. -1.75 or +3.20):');
+    if (pl === null) return;
+    fetch('/api/settle_prediction/' + btn.dataset.predId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actual_position: parseInt(pos), profit_loss: parseFloat(pl) })
+    }).then(function () { location.reload(); });
+  });
+}());
+</script>

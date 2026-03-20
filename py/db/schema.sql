@@ -169,7 +169,29 @@ CREATE TABLE IF NOT EXISTS hypothesis (
     UNIQUE(hypothesis_type, subject_key)
 );
 
+-- Real-race predictions (live betting tracking — source='real' vs sim bets)
+CREATE TABLE IF NOT EXISTS real_race_predictions (
+    id INTEGER PRIMARY KEY,
+    race_date TEXT NOT NULL,            -- ISO8601 date "YYYY-MM-DD"
+    venue TEXT NOT NULL,
+    race_time TEXT NOT NULL,            -- "14:30"
+    horse_name TEXT NOT NULL,
+    strategy_class TEXT NOT NULL,
+    bet_type TEXT NOT NULL,             -- "win"|"each_way"|"dutch"
+    stake_pct REAL NOT NULL,            -- % of bankroll
+    predicted_position INTEGER,         -- expected finish position
+    confidence REAL,                    -- 0.0–1.0
+    sp_at_tip REAL,                     -- odds when prediction made
+    actual_position INTEGER,            -- filled on settlement
+    profit_loss REAL,                   -- filled on settlement (£ based on £5 bankroll)
+    settled INTEGER NOT NULL DEFAULT 0, -- 0=pending, 1=settled
+    source TEXT NOT NULL DEFAULT 'real',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    settled_at TEXT
+);
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_real_preds_date ON real_race_predictions(race_date);
 CREATE INDEX IF NOT EXISTS idx_races_day    ON races(sim_day);
 CREATE INDEX IF NOT EXISTS idx_races_venue  ON races(venue_id);
 CREATE INDEX IF NOT EXISTS idx_runners_race ON runners(race_id);
